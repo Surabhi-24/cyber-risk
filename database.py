@@ -1,4 +1,5 @@
 import sqlite3
+from riskengine import calculate_risk_score, classify_risk
 def connect_db():
     conn = sqlite3.connect('risk_data.db')
     return conn 
@@ -58,18 +59,64 @@ def create_tables():
     """)
     conn.commit()
     conn.close()
-if __name__ == "__main__":
-    create_tables()
-
+def add_asset(asset_name, asset_type, owner, description):
     conn = connect_db()
     cursor = conn.cursor()
-
     cursor.execute("""
-        SELECT name FROM sqlite_master 
-        WHERE type='table'
-    """)
-    tables = cursor.fetchall()
-    print("Tables in the database:")
-    for table in tables:
-        print(table[0])
+        INSERT INTO assets (asset_name, asset_type, owner, description)
+        VALUES (?, ?, ?, ?)
+    """, (asset_name, asset_type, owner, description))
+    conn.commit()
     conn.close()
+
+def get_assets():
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM assets")
+    assets = cursor.fetchall()
+    conn.close()
+    return assets
+
+def add_risk(
+        asset_id,
+        risk_title, 
+        description, likelihood, impact):
+    inherited_score = calculate_risk_score(likelihood, impact)
+    risk_level = classify_risk(inherited_score)
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO risks (asset_id, risk_title, description, likelihood, impact, inherited_risk, risk_level)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (asset_id, risk_title, description, likelihood, impact, inherited_score, risk_level))
+    conn.commit()
+    conn.close()
+
+def get_risks():
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM risks")
+    risks = cursor.fetchall()
+    conn.close()
+    return risks
+
+if __name__ == "__main__":
+    create_tables()
+    add_risk(
+        1, 
+        "Data Breach Risk", 
+        "Potential exposure of sensitive customer data", 
+        4, 
+        5, 
+    )
+
+    add_asset(
+        "Customer Database", 
+        "Data Store", 
+        "IT Department",
+        "Contains sensitive customer information"
+    )
+risks = get_risks()
+print("Retrieved Risks:")
+for risk in risks:
+    print(risk)
